@@ -61,6 +61,7 @@ int main(){
 		printf("[%s:%u] %s %s %s\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), method, version, uri);
 
 		get_content(response, uri);
+		write_log(response);
 
 		int val_response = write(new_sock, response, strlen(response));
 		if(val_response < 0){
@@ -68,6 +69,7 @@ int main(){
 			continue;
 		}
 
+		clear_buffer(response);
 		close(new_sock);
 	}
 
