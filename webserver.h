@@ -21,12 +21,41 @@ char *sliding_window(char *string, unsigned int start,  unsigned int end){
     return newString;
 }
 
+void idenfity_content_type(char *filename, char *content){
+    strcpy(content,
+    "HTTP/1.0 200 OK\r\n"
+    "Server: server.c\r\n"
+    "Content-Type:"
+    ); 
+    int content_len = strlen(content);
+
+
+    if(strstr(filename, ".json") != NULL){ 
+        strcpy(content + content_len, " application/json\r\n\r\n");
+        return;
+    }
+
+    if(strstr(filename, ".js") != NULL){ 
+        strcpy(content + content_len, " application/javascript\r\n\r\n");
+        return;
+    }
+
+    if(strstr(filename, ".css") != NULL){ 
+        strcpy(content + content_len, " text/css\r\n\r\n");
+        return;
+    }
+
+    strcpy(content + content_len, " text/html\r\n\r\n");
+    return;
+}
+
 void get_content(char *content, char *uri){
     FILE *file = NULL;
-    
+    int index = 0;
     char *path = sliding_window(uri, 1, strlen(uri));
     if(strcmp(uri, "/") == 0){
         file = fopen("index.html", "r");
+        index = 1;
     }
     else{
         file = fopen(path, "r");
@@ -42,11 +71,7 @@ void get_content(char *content, char *uri){
         return;
     }
     
-    strcpy(content,
-    "HTTP/1.0 200 OK\r\n"
-    "Server: server.c\r\n"
-    "Content-Type: text/html\r\n\r\n"
-    );
+    idenfity_content_type(index ? "index.html" : path, content);
     
     free(path);
     
@@ -75,10 +100,14 @@ void write_log(char *message){
     fclose(log);
 }
 
-void clear_buffer(char *response){
-    memset(response, '\0', strlen(response));
+void clear_buffer(char *buffer){
+    memset(buffer, '\0', strlen(buffer));
 }
+
 // int main(){
+//     char reponse[1000];
+//     idenfity_content_type("index.html", reponse);
+//     printf("%s", reponse);
 //     write_log("eu odeio");
 //     char buffer[1000];
 //     get_content(buffer, "/a.html");
