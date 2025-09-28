@@ -77,6 +77,7 @@ void get_content(char *content, char *uri){
     
     int len = strlen(content);
     fread(content + len, sizeof(char), (1000 - len), file);
+    content[strlen(content)+1] = '\0';
 }
 
 void write_log(char *message){
