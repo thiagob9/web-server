@@ -4,81 +4,12 @@
 #include <stdlib.h>
 #include <time.h>
 #include <errno.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 
-char *sliding_window(char *string, unsigned int start,  unsigned int end){
-    int newLen = end - start;
-    if(newLen < 1){
-        return NULL;
-    }
-
-    char *newString = malloc(sizeof(char)*(newLen+1));
-    int j = 0;
-    for(int i = start; i < end; i++){
-        newString[j] = string[i];
-        j++;
-    }
-    newString[j] = '\0';
-    return newString;
-}
-
-void idenfity_content_type(char *filename, char *content){
-    strcpy(content,
-    "HTTP/1.0 200 OK\r\n"
-    "Server: server.c\r\n"
-    "Content-Type:"
-    ); 
-    int content_len = strlen(content);
-
-
-    if(strstr(filename, ".json") != NULL){ 
-        strcpy(content + content_len, " application/json\r\n\r\n");
-        return;
-    }
-
-    if(strstr(filename, ".js") != NULL){ 
-        strcpy(content + content_len, " application/javascript\r\n\r\n");
-        return;
-    }
-
-    if(strstr(filename, ".css") != NULL){ 
-        strcpy(content + content_len, " text/css\r\n\r\n");
-        return;
-    }
-
-    strcpy(content + content_len, " text/html\r\n\r\n");
-    return;
-}
-
-void get_content(char *content, char *uri){
-    FILE *file = NULL;
-    int index = 0;
-    char *path = sliding_window(uri, 1, strlen(uri));
-    if(strcmp(uri, "/") == 0){
-        file = fopen("index.html", "r");
-        index = 1;
-    }
-    else{
-        file = fopen(path, "r");
-    }
-
-
-    if(file == NULL){
-        strcpy(content,
-        "HTTP/1.0 404 NOT FOUND\r\n"
-        "Server: server.c\r\n"
-        "Content-Type: text/html\r\n\r\n"
-        "<html><h1>404 Not Found</h1></html>");
-        return;
-    }
-    
-    idenfity_content_type(index ? "index.html" : path, content);
-    
-    free(path);
-    
-    int len = strlen(content);
-    fread(content + len, sizeof(char), (1000 - len), file);
-    content[strlen(content)+1] = '\0';
-}
+#define PORT 8080
+#define BUFFER_SIZE 1024
+#define MAX_LENGTH_BODY 1024
 
 void write_log(char *message){
    FILE *log = fopen("server.log","a+");
@@ -101,16 +32,122 @@ void write_log(char *message){
     fclose(log);
 }
 
-void clear_buffer(char *buffer){
-    memset(buffer, '\0', strlen(buffer));
+char *get_file_type(char *file){
+    if(strstr(file, ".html")){
+        return "text/html";
+    }
+
+    if(strstr(file, ".css")){
+        return "text/css";
+    }
+
+    if(strstr(file, ".json")){
+        return "application/json";
+    }
+
+    if(strstr(file, ".js")){
+        return "application/javascript";
+    }
+
+    if(strstr(file, ".png")){
+        return "image/png";
+    }
+
+    if(strstr(file, ".jpeg")){
+        return "image/jpeg";
+    }
+
+    if(strstr(file, ".gif")){
+        return "image/gif";
+    }
+
+    if(strstr(file, ".svg")){
+        return "image/svgh+xml";
+    }
+
+    if(strstr(file, ".pdf")){
+        return "application/pdf";
+    }
+
+    return "application/octet-stream";
 }
 
-// int main(){
-//     char reponse[1000];
-//     idenfity_content_type("index.html", reponse);
-//     printf("%s", reponse);
-//     write_log("eu odeio");
-//     char buffer[1000];
-//     get_content(buffer, "/a.html");
-//     printf("%s", buffer);
-// }
+void send_content(int sock, char *content, char *uri){
+    FILE *file = NULL;
+    char *file_type = NULL;
+    int uri_len = strlen(uri);
+
+    if(uri[strlen(uri)-1] == '/'){
+        int extra_len = strlen("index.html");
+        char *file_path = malloc((sizeof(char))*(uri_len+extra_len+2));
+        
+        if(file_path == NULL){
+            perror(file_path);
+            exit(1);
+        }   
+
+        memset(file_path, '\0', strlen(file_path));
+
+        file_path[0] = '.';
+        strncat(file_path, uri, uri_len);
+        strncat(file_path, "index.html", extra_len);
+        
+        file_path[uri_len+extra_len+1] = '\0';
+        file = fopen(file_path, "rb");
+        free(file_path);
+        file_type = "text/html";
+    }else{
+        char *file_path = malloc(sizeof(char)*(uri_len+2));
+        if(file_path == NULL){
+            perror(file_path);
+            exit(1);
+        }
+
+        memset(file_path, '\0', strlen(file_path));
+        file_path[0] = '.';
+        strncat(file_path, uri, uri_len);
+        
+        file_path[uri_len+1] = '\0';
+        file = fopen(file_path, "rb");
+        free(file_path);
+        file_type = get_file_type(uri);
+    }
+    
+    if(file == NULL){
+        char *header = "HTTP/1.0 404 NOT FOUND\r\n"
+        "Server: server.c\r\n"
+        "Content-Type: text/html\r\n\r\n"
+        "<html><h1>PAGE NOT FOUND</h1></html>"; 
+    
+        int val_response = write(sock, header, strlen(header));
+        if(val_response < 0){
+            perror("error trying to send response");
+        }
+        return;
+    }
+
+    printf("\n\n%s\n\n", file_type);
+    char header[200];
+
+    snprintf(header, 200, "HTTP/1.0 200 OK\r\n"
+    "Server: server.c\r\n"
+    "Content-Type: %s\r\n\r\n", file_type);
+    
+    int val_response = write(sock, header, strlen(header));
+    if(val_response < 0){
+        perror("error trying to send response");
+        return;
+    }
+
+    size_t n = 0;
+    while((n = fread(content, 1, MAX_LENGTH_BODY, file)) > 0){
+        val_response = write(sock, content, n);
+        
+        if(val_response < 0){
+            perror("error trying to send response");
+            return;
+        }
+    }
+    fclose(file);
+    write_log(content);
+}

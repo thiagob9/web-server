@@ -1,15 +1,8 @@
-#include <arpa/inet.h>
-#include <errno.h>
-#include <sys/socket.h>
 #include "webserver.h"
-
-
-#define PORT 8080
-#define BUFFER_SIZE 1024
 
 int main(){
 	char buffer[BUFFER_SIZE];
-	char response[1000];
+	char response[MAX_LENGTH_BODY];
 
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 	if(sock == -1){
@@ -60,16 +53,7 @@ int main(){
 
 		printf("[%s:%u] %s %s %s\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), method, version, uri);
 
-		get_content(response, uri);
-		write_log(response);
-
-		int val_response = write(new_sock, response, strlen(response));
-		if(val_response < 0){
-			perror("error trying to send response");
-			continue;
-		}
-
-		clear_buffer(response);
+		send_content(new_sock, response, uri);
 		close(new_sock);
 	}
 
