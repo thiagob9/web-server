@@ -39,23 +39,29 @@ int main(){
 			continue;
 		}
 		printf("connection accepted\n");
+		
+		if(fork() == 0){
+			int sock_ip = getsockname(new_sock, (struct sockaddr *)&client_addr, (socklen_t *)&addr_client_len);
 
-		int sock_ip = getsockname(new_sock, (struct sockaddr *)&client_addr, (socklen_t *)&addr_client_len);
+			int request = read(new_sock, buffer, BUFFER_SIZE);
+			if(request < 0){
+				perror("error trying to read the request");
+				continue;
+			}
 
-		int request = read(new_sock, buffer, BUFFER_SIZE);
-		if(request < 0){
-			perror("error trying to read the request");
-			continue;
+			char method[BUFFER_SIZE], uri[BUFFER_SIZE], version[BUFFER_SIZE];
+			sscanf(buffer, "%s %s %s", method, uri, version);
+
+			printf("[%s:%u] %s %s %s\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), method, version, uri);
+
+			send_content(new_sock, response, uri);
+			close(new_sock);
+			_exit(0);
 		}
-
-		char method[BUFFER_SIZE], uri[BUFFER_SIZE], version[BUFFER_SIZE];
-		sscanf(buffer, "%s %s %s", method, uri, version);
-
-		printf("[%s:%u] %s %s %s\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), method, version, uri);
-
-		send_content(new_sock, response, uri);
+		
 		close(new_sock);
 	}
+
 
 	return 0;
 }

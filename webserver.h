@@ -1,3 +1,4 @@
+#pragma once 
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -73,6 +74,20 @@ char *get_file_type(char *file){
 }
 
 void send_content(int sock, char *content, char *uri){
+    if(strstr(uri, "../")){
+        char *header = "HTTP/1.0 404 NOT FOUND\r\n"
+        "Server: server.c\r\n"
+        "Content-Type: text/html\r\n\r\n"
+        "<html><h1>PAGE NOT FOUND</h1></html>"; 
+    
+        int val_response = write(sock, header, strlen(header));
+        if(val_response < 0){
+            perror("error trying to send response");
+        }
+        return;       
+    }
+
+
     FILE *file = NULL;
     char *file_type = NULL;
     int uri_len = strlen(uri);
